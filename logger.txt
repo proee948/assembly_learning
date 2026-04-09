@@ -1,0 +1,60 @@
+section .data
+    dev     db "/dev/input/event2", 0    ; keyboard device
+    dev_len equ $ - dev
+
+section .bss
+    event   resb 24                      ; input_event struct is 24 bytes
+
+section .text
+global _start
+
+_start:
+    ; open /dev/input/event0
+    mov rax, 2                           ; open syscall
+    mov rdi, dev                         ; filename
+    mov rsi, 0                           ; O_RDONLY
+    mov rdx, 0                           ; mode
+    syscall
+    mov r8, rax                          ; save file descriptor
+
+read_loop:
+    ; read one input_event struct
+    mov rax, 0                           ; read syscall
+    mov rdi, r8                          ; our device fd
+    mov rsi, event                       ; store into event buffer
+    mov rdx, 24                          ; input_event is 24 bytes
+    syscall
+
+    ; input_event structure:
+    ; bytes 0-7   = timeval seconds
+    ; bytes 8-15  = timeval microseconds  
+    ; bytes 16-17 = type
+    ; bytes 18-19 = code (which key)
+    ; bytes 20-23 = value (1=down, 0=up, 2=hold)
+
+    ; check if type == 1 (EV_KEY, keyboard event)
+    movzx rax, word [event + 16]         ; load type field
+    cmp rax, 1
+    jne read_loop                        ; ignore if not keyboard
+
+    ; check if value == 1 (key down only, ignore up/hold)
+    mov eax, dword [event + 20]          ; load value field
+    cmp eax, 1
+    jne read_loop
+
+    ; rax now has the keycode
+    movzx rax, word [event + 18]         ; load code field
+
+    ; loop forever
+    jmp read_loop
+
+    ; close device (never reached but good practice)
+    mov rax, 3                           ; close syscall
+    mov rdi, r8
+    syscall
+
+    ; exit
+    mov rax, 60
+    mov rdi, 0
+    syscall
+
