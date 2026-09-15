@@ -7,7 +7,7 @@ xor rcx,rcx
 xor rax,rax
 lea rax,s1
 call _strlen
-int3
+ret
 
 _strlen:
 str_loop:
